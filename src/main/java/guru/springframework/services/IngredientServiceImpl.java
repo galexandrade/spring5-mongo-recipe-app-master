@@ -37,14 +37,13 @@ public class IngredientServiceImpl implements IngredientService {
 
     @Override
     public Mono<IngredientCommand> findByRecipeIdAndIngredientId(String recipeId, String ingredientId) {
-        return recipeReactiveRepository.findById(recipeId)
-                .map(recipe -> recipe.getIngredients()
-                                .stream()
-                                .filter(ingredient -> ingredient.getId().equalsIgnoreCase(ingredientId))
-                                .findFirst())
-                .filter(Optional::isPresent)
+        return recipeReactiveRepository
+                .findById(recipeId)
+                .flatMapIterable(Recipe::getIngredients)
+                .filter(ingredient -> ingredient.getId().equalsIgnoreCase(ingredientId))
+                .single()
                 .map(ingredient -> {
-                   IngredientCommand command = ingredientToIngredientCommand.convert(ingredient.get());
+                   IngredientCommand command = ingredientToIngredientCommand.convert(ingredient);
                    command.setRecipeId(recipeId);
                    return command;
                 });
@@ -134,6 +133,7 @@ public class IngredientServiceImpl implements IngredientService {
         Recipe recipe = recipeReactiveRepository.findById(recipeId).block();
 
         if(recipe != null){
+
             log.debug("found recipe");
 
             Optional<Ingredient> ingredientOptional = recipe
@@ -144,10 +144,9 @@ public class IngredientServiceImpl implements IngredientService {
 
             if(ingredientOptional.isPresent()){
                 log.debug("found Ingredient");
-                Ingredient ingredientToDelete = ingredientOptional.get();
-               // ingredientToDelete.setRecipe(null);
+
                 recipe.getIngredients().remove(ingredientOptional.get());
-                recipeReactiveRepository.save(recipe);
+                recipeReactiveRepository.save(recipe).block();
             }
         } else {
             log.debug("Recipe Id Not found. Id:" + recipeId);
